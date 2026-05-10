@@ -1,0 +1,27 @@
+{
+  "Amor de Bicho": {
+    "mercadolivre": "amordebichocampinas",
+    "amazon": "amordebicho-20",
+    "shopee": "amordebicho"
+  },
+  "Oeste SBC": {
+    "mercadolivre": "insanos1oestesbc",
+    "amazon": "insanosoestesbc-20",
+    "shopee": "insanosoestesbc"
+  },
+  "Rogi Mirim": {
+    "mercadolivre": "rogimirimong",
+    "amazon": "rogimirim-20",
+    "shopee": "rogimirim"
+  },
+  "Visão Mundial": {
+    "mercadolivre": "visaomundial",
+    "amazon": "visaomundialbr-20",
+    "shopee": "visaomundialbr"
+  },
+  "Casa1": {
+    "mercadolivre": "casa1",
+    "amazon": "casaum1-20",
+    "shopee": "casaum"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep *)",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(Get-ChildItem -Force -Path \"C:\\\\Users\\\\bruno\\\\Documents\\\\BotRedoma_v2\" | ForEach-Object { $_.Name })",
+      "PowerShell(Get-Content \"C:\\\\Users\\\\bruno\\\\Documents\\\\BotRedoma_v2\\\\.env\" | ForEach-Object { \\($_ -split '='\\)[0] })",
+      "PowerShell(Get-Content \"C:\\\\Users\\\\bruno\\\\Documents\\\\BotRedoma_v2\\\\.env\" | Where-Object { $_ -match \"SUPABASE|BOT_SECRET\" })"
+    ]
+  }
+}
