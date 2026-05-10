@@ -3,3 +3,5 @@ __pycache__/
 .env 
 chrome_debug_profile/ 
 *.pyc 
+.idea/ 
+.claude/ 
