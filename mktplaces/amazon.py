@@ -1,12 +1,17 @@
 from modulos.playwright_func import (
-    navigate, human_fill, human_click,
-    find_element, extract_value, human_delay, human_click_locator, select_amazon_trackid
+    navigate,
+    find_element,
+    extract_value,
+    human_delay,
+    human_click_locator,
 )
 
-async def gerar_link_amazon(page, product_url: str, tag: str) -> dict:
+
+async def gerar_link_amazon(page, product_url: str) -> dict:
 
     try:
         await navigate(page, product_url)
+
         btn_gerar = await find_element(page, [
             "#amzn-ss-get-link-button",
             "button[title='Obter link']",
@@ -15,7 +20,8 @@ async def gerar_link_amazon(page, product_url: str, tag: str) -> dict:
         if not btn_gerar:
             return {"success": False, "affiliate_link": None, "error": "Botão Gerar não encontrado."}
 
-        await select_amazon_trackid(page, tag)
+        await human_click_locator(btn_gerar)
+        await human_delay(1500, 3000)
 
         btn = await find_element(page, [
             "#amzn-ss-get-link-btn-text-announce",
@@ -23,6 +29,9 @@ async def gerar_link_amazon(page, product_url: str, tag: str) -> dict:
         ])
         if not btn:
             return {"success": False, "affiliate_link": None, "error": "Botão gerar link não encontrado."}
+
+        await human_click_locator(btn)
+        await human_delay(1500, 3000)
 
         # Extrai o link gerado
         link = await extract_value(page, "#amzn-ss-text-shortlink-textarea")
