@@ -8,31 +8,39 @@ from modulos.playwright_func import (
     human_click_locator,
 )
 
+TEXTAREA_SELECTORS = [
+    "#amzn-ss-text-shortlink-textarea",
+    "textarea.amzn-ss-text-shortlink-textarea",
+]
+
 
 async def gerar_link_amazon(page, product_url: str) -> dict:
 
     try:
         await navigate(page, product_url)
 
-        btn_gerar = await find_element(page, [
+        # O SiteStripe já carrega o link na textarea na maioria dos casos —
+        # tenta extrair direto sem clicar em nada
+        await human_delay(1500, 2500)
+
+        link = await extract_value(page, TEXTAREA_SELECTORS[0])
+        if not link:
+            link = await extract_value(page, TEXTAREA_SELECTORS[1])
+
+        if link:
+            return {"success": True, "affiliate_link": link, "error": None}
+
+        # Link não estava pronto — clica em "Obter link" e aguarda aparecer
+        btn = await find_element(page, [
+            "#amzn-ss-get-link-btn-text-announce",
             "#amzn-ss-get-link-button",
             "button[title='Obter link']",
             "button:has-text('Obter link')",
         ])
-        if not btn_gerar:
-            return {"success": False, "affiliate_link": None, "error": "Botão Gerar não encontrado."}
-
-        await human_click_locator(btn_gerar)
-        await human_delay(1500, 3000)
-
-        btn = await find_element(page, [
-            "#amzn-ss-get-link-btn-text-announce",
-            "button:has-text('Obter link')",
-        ])
         if not btn:
-            return {"success": False, "affiliate_link": None, "error": "Botão gerar link não encontrado."}
+            return {"success": False, "affiliate_link": None, "error": "Botão 'Obter link' não encontrado e textarea vazia."}
 
-        # Aguarda o botão sair do estado disabled antes de clicar (até 15s)
+        # Aguarda o botão habilitar (até 15s)
         for _ in range(30):
             is_disabled = await btn.evaluate("el => el.disabled")
             if not is_disabled:
@@ -44,10 +52,9 @@ async def gerar_link_amazon(page, product_url: str) -> dict:
         await human_click_locator(btn)
         await human_delay(1500, 3000)
 
-        # Extrai o link gerado
-        link = await extract_value(page, "#amzn-ss-text-shortlink-textarea")
+        link = await extract_value(page, TEXTAREA_SELECTORS[0])
         if not link:
-            link = await extract_value(page, "textarea.amzn-ss-text-shortlink-textarea")
+            link = await extract_value(page, TEXTAREA_SELECTORS[1])
 
         if link:
             return {"success": True, "affiliate_link": link, "error": None}
