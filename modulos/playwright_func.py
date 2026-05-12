@@ -24,10 +24,10 @@ Uso:
     )
 
     session = BrowserSession()
-    await session.start()            # abre Chrome, fica em standby
-    page = session.get_page()        # pega a page quando tiver trabalho
-    await navigate(page, url)        # navega
-    await session.stop()             # encerra
+    await session.start()                            # abre Chrome, fica em standby
+    page = await session.get_page_for("mercadolivre") # pega/cria aba do marketplace
+    await navigate(page, url)                        # navega
+    await session.stop()                             # encerra
 """
 
 import asyncio
@@ -125,17 +125,6 @@ STEALTH_JS = """
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def get_chrome_profile_path(profile: str = "Default") -> str:
-    """
-    Retorna o caminho do User Data Dir do Chrome instalado.
-
-    Detecta automaticamente por SO:
-      - Windows: %LOCALAPPDATA%/Google/Chrome/User Data
-      - macOS:   ~/Library/Application Support/Google/Chrome
-      - Linux:   ~/.config/google-chrome
-
-    O argumento `profile` é o nome da pasta do perfil
-    (Default, Profile 1, Profile 2, etc).
-    """
     sistema = platform.system()
 
     if sistema == "Windows":
@@ -160,21 +149,15 @@ def get_chrome_profile_path(profile: str = "Default") -> str:
 
 async def create_stealth_browser(
     cdp_url: str = "http://localhost:9222",
-) -> tuple[Playwright, BrowserContext, Page]:
+) -> tuple[Playwright, BrowserContext]:
 
     pw = await async_playwright().start()
-
-    # Conecta no Chrome que já está rodando
     browser = await pw.chromium.connect_over_cdp(cdp_url)
-
-    ctx = browser.contexts[0]  # Pega o contexto existente (perfil logado)
+    ctx = browser.contexts[0]
     await ctx.add_init_script(STEALTH_JS)
 
-    pages = ctx.pages
-    page = pages[0] if pages else await ctx.new_page()
-
     logger.info("Conectado ao Chrome via CDP.")
-    return pw, ctx, page
+    return pw, ctx
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -182,18 +165,15 @@ async def create_stealth_browser(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async def human_delay(min_ms: int = 300, max_ms: int = 900) -> None:
-    """Pausa aleatória entre ações. Simula hesitação humana."""
     ms = random.randint(min_ms, max_ms)
     await asyncio.sleep(ms / 1000)
 
 
 async def human_long_pause() -> None:
-    """Pausa longa (1.5–4s). Simula leitura de página ou distração."""
     await asyncio.sleep(random.uniform(1.5, 4.0))
 
 
 async def human_short_pause() -> None:
-    """Pausa curta (100–400ms). Simula transição entre ações."""
     await asyncio.sleep(random.randint(100, 400) / 1000)
 
 
@@ -202,13 +182,6 @@ async def human_short_pause() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async def human_type(page: Page, selector: str, text: str) -> None:
-    """
-    Digita texto caractere por caractere com timing humano.
-
-    - 35–130ms entre teclas (ritmo natural)
-    - ~8% de chance de pausa longa por caractere (olhou pro teclado)
-    - Click no campo antes de digitar
-    """
     locator = page.locator(selector).first
     await locator.wait_for(state="visible", timeout=5000)
     await locator.click()
@@ -216,19 +189,13 @@ async def human_type(page: Page, selector: str, text: str) -> None:
 
     for char in text:
         await locator.type(char, delay=0)
-
         key_delay = random.randint(35, 130)
         if random.random() < 0.08:
             key_delay += random.randint(200, 500)
-
         await asyncio.sleep(key_delay / 1000)
 
 
 async def human_fill(page: Page, selector: str, text: str) -> None:
-    """
-    Limpa o campo e digita com timing humano.
-    Faz Ctrl+A → Backspace antes de digitar (mais natural que .clear()).
-    """
     locator = page.locator(selector).first
     await locator.wait_for(state="visible", timeout=5000)
     await locator.click()
@@ -241,11 +208,9 @@ async def human_fill(page: Page, selector: str, text: str) -> None:
 
     for char in text:
         await locator.type(char, delay=0)
-
         key_delay = random.randint(35, 130)
         if random.random() < 0.08:
             key_delay += random.randint(200, 500)
-
         await asyncio.sleep(key_delay / 1000)
 
     await human_short_pause()
@@ -256,10 +221,6 @@ async def human_fill(page: Page, selector: str, text: str) -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async def human_click(page: Page, selector: str, timeout: int = 5000) -> None:
-    """
-    Clica num elemento com comportamento humano:
-    hover → pausa curta → click.
-    """
     locator = page.locator(selector).first
     await locator.wait_for(state="visible", timeout=timeout)
     await locator.hover()
@@ -269,10 +230,6 @@ async def human_click(page: Page, selector: str, timeout: int = 5000) -> None:
 
 
 async def human_click_locator(locator: Locator) -> None:
-    """
-    Mesma coisa que human_click, mas recebe um Locator direto.
-    Útil quando você já encontrou o elemento via find_element.
-    """
     await locator.hover()
     await human_delay(80, 300)
     await locator.click()
@@ -288,19 +245,6 @@ async def find_element(
     selectors: list[str],
     timeout: int = 3000,
 ) -> Locator | None:
-    """
-    Tenta localizar um elemento visível usando uma lista de seletores.
-    Retorna o primeiro que encontrar, ou None.
-
-    Uso:
-        btn = await find_element(page, [
-            "button:has-text('Gerar link')",
-            "button:has-text('Gerar')",
-            "button[type='submit']",
-        ])
-        if btn:
-            await human_click_locator(btn)
-    """
     for selector in selectors:
         try:
             locator = page.locator(selector).first
@@ -308,7 +252,6 @@ async def find_element(
             return locator
         except PlaywrightTimeout:
             continue
-
     return None
 
 
@@ -317,13 +260,11 @@ async def find_element(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async def navigate(page: Page, url: str, wait_until: str = "domcontentloaded") -> None:
-    """Navega pra URL e espera com pausa humana depois."""
     await page.goto(url, wait_until=wait_until)
     await human_delay(1500, 3500)
 
 
 async def wait_for_url_contains(page: Page, fragment: str, timeout: int = 15000) -> bool:
-    """Espera a URL conter um fragmento. Retorna True se encontrou."""
     try:
         await page.wait_for_url(f"**/*{fragment}*", timeout=timeout)
         return True
@@ -332,7 +273,6 @@ async def wait_for_url_contains(page: Page, fragment: str, timeout: int = 15000)
 
 
 async def is_on_page(page: Page, *fragments: str) -> bool:
-    """Checa se a URL atual contém algum dos fragmentos."""
     url = page.url.lower()
     return any(f.lower() in url for f in fragments)
 
@@ -342,7 +282,6 @@ async def is_on_page(page: Page, *fragments: str) -> bool:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async def extract_text(page: Page, selector: str, timeout: int = 3000) -> str | None:
-    """Extrai o texto visível de um elemento."""
     try:
         locator = page.locator(selector).first
         await locator.wait_for(state="visible", timeout=timeout)
@@ -352,7 +291,6 @@ async def extract_text(page: Page, selector: str, timeout: int = 3000) -> str | 
 
 
 async def extract_value(page: Page, selector: str, timeout: int = 3000) -> str | None:
-    """Extrai o value de um input/textarea."""
     try:
         locator = page.locator(selector).first
         await locator.wait_for(state="visible", timeout=timeout)
@@ -363,7 +301,6 @@ async def extract_value(page: Page, selector: str, timeout: int = 3000) -> str |
 
 
 async def extract_all_text(page: Page) -> str:
-    """Extrai todo o texto visível do body. Útil pra fallback com regex."""
     try:
         return await page.locator("body").inner_text()
     except Exception:
@@ -371,7 +308,6 @@ async def extract_all_text(page: Page) -> str:
 
 
 async def extract_clipboard(page: Page) -> str | None:
-    """Lê o conteúdo do clipboard. Precisa da permission clipboard-read."""
     try:
         clip = await page.evaluate("navigator.clipboard.readText()")
         return clip.strip() if clip else None
@@ -384,16 +320,10 @@ async def extract_clipboard(page: Page) -> str | None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async def select_option(page: Page, selector: str, label: str) -> bool:
-    """
-    Seleciona opção num <select> ou dropdown customizado.
-    Tenta <select> nativo primeiro, depois clica e procura o texto.
-    """
     try:
         locator = page.locator(selector).first
         await locator.wait_for(state="visible", timeout=3000)
-
         tag = await locator.evaluate("el => el.tagName.toLowerCase()")
-
         if tag == "select":
             await locator.select_option(label=label)
         else:
@@ -401,10 +331,8 @@ async def select_option(page: Page, selector: str, label: str) -> bool:
             await human_delay(200, 500)
             option = page.locator(f"text='{label}'").first
             await human_click_locator(option)
-
         await human_short_pause()
         return True
-
     except Exception:
         return False
 
@@ -426,13 +354,6 @@ async def select_amazon_trackid(page, tag: str):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async def human_scroll(page: Page, direction: str = "down", intensity: int = 3) -> None:
-    """
-    Scroll com comportamento humano — vários steps pequenos com
-    pausas entre eles, em vez de um salto único.
-
-    direction: 'down' ou 'up'
-    intensity: 1 (suave) a 5 (agressivo)
-    """
     steps = random.randint(intensity, intensity + 3)
     for _ in range(steps):
         delta = random.randint(80, 250)
@@ -440,12 +361,10 @@ async def human_scroll(page: Page, direction: str = "down", intensity: int = 3) 
             delta = -delta
         await page.mouse.wheel(0, delta)
         await asyncio.sleep(random.uniform(0.1, 0.35))
-
     await human_short_pause()
 
 
 async def scroll_to_element(page: Page, selector: str) -> None:
-    """Scrolla até um elemento ficar visível."""
     try:
         locator = page.locator(selector).first
         await locator.scroll_into_view_if_needed()
@@ -459,14 +378,12 @@ async def scroll_to_element(page: Page, selector: str) -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async def take_screenshot(page: Page, path: str = "debug_screenshot.png") -> str:
-    """Tira screenshot da página. Retorna o caminho do arquivo."""
     await page.screenshot(path=path, full_page=False)
     logger.info(f"Screenshot salvo: {path}")
     return path
 
 
 async def log_current_state(page: Page) -> None:
-    """Loga URL e título atual — útil pra debug."""
     url = page.url
     title = await page.title()
     logger.info(f"URL: {url}")
@@ -474,58 +391,77 @@ async def log_current_state(page: Page) -> None:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Ciclo de vida — Standby / Trabalho / Shutdown
+# Ciclo de vida — Uma aba por marketplace
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class BrowserSession:
     """
-    Gerencia o ciclo de vida do browser:
+    Gerencia o ciclo de vida do browser com uma aba fixa por marketplace.
 
-      1. start()    → abre o Chrome com perfil pessoal
-      2. standby    → browser aberto, sem fazer nada
-      3. get_page() → retorna a page quando precisar trabalhar
-      4. stop()     → fecha tudo
+    Problema resolvido: antes havia uma única page compartilhada — se chegasse
+    um link do ML e logo depois um da Shopee, o bot navegava por cima do ML
+    e derrubava o processamento em andamento.
 
-    O browser abre UMA VEZ e fica em standby.
-    Quando chega mensagem pra processar, pega a page e navega.
-    Quando termina, volta pro standby (browser continua aberto).
+    Solução: cada marketplace tem sua própria aba (Page) e seu próprio Lock.
+    - A aba é criada na primeira requisição e reutilizada nas seguintes.
+    - O lock garante que duas requisições do mesmo marketplace não se sobreponham.
+    - Marketplaces diferentes rodam em paralelo sem se atrapalhar.
 
     Uso:
         session = BrowserSession()
         await session.start()
 
-        # Quando tiver trabalho:
-        page = session.get_page()
-        await navigate(page, "https://...")
-        # ... scraping ...
+        # No endpoint:
+        async with session.get_lock_for("mercadolivre"):
+            page = await session.get_page_for("mercadolivre")
+            # ... gera o link ...
 
-        # Quando quiser encerrar de vez:
         await session.stop()
     """
 
-    def __init__(self, user_data_dir: str | None = None, headless: bool = False):
-        self._user_data_dir = user_data_dir
-        self._headless = headless
+    def __init__(self):
         self._pw: Playwright | None = None
         self._ctx: BrowserContext | None = None
-        self._page: Page | None = None
+        self._pages: dict[str, Page] = {}   # marketplace → aba dedicada
+        self._locks: dict[str, asyncio.Lock] = {}  # marketplace → lock
         self._running = False
 
     async def start(self) -> None:
-        """Abre o Chrome e deixa em standby."""
+        """Conecta ao Chrome e deixa em standby."""
         if self._running:
             logger.info("Browser já está rodando.")
             return
 
-        self._pw, self._ctx, self._page = await create_stealth_browser()
+        self._pw, self._ctx = await create_stealth_browser()
         self._running = True
         logger.info("Browser em standby — aguardando trabalho.")
 
-    def get_page(self) -> Page:
-        """Retorna a page ativa. Levanta erro se o browser não estiver aberto."""
-        if not self._running or not self._page:
+    async def get_page_for(self, marketplace: str) -> Page:
+        """
+        Retorna a aba dedicada ao marketplace.
+        Se ainda não existe ou foi fechada, abre uma nova.
+        """
+        if not self._running or not self._ctx:
             raise RuntimeError("Browser não está rodando. Chame start() primeiro.")
-        return self._page
+
+        page = self._pages.get(marketplace)
+
+        if page is None or page.is_closed():
+            logger.info(f"Abrindo aba para [{marketplace}]...")
+            page = await self._ctx.new_page()
+            self._pages[marketplace] = page
+            logger.info(f"Aba [{marketplace}] pronta.")
+
+        return page
+
+    def get_lock_for(self, marketplace: str) -> asyncio.Lock:
+        """
+        Retorna o lock exclusivo do marketplace.
+        Garante que apenas uma requisição por vez use cada aba.
+        """
+        if marketplace not in self._locks:
+            self._locks[marketplace] = asyncio.Lock()
+        return self._locks[marketplace]
 
     @property
     def is_running(self) -> bool:
@@ -534,15 +470,17 @@ class BrowserSession:
     async def ensure_alive(self) -> bool:
         """
         Verifica se o browser ainda está responsivo.
-        Se caiu, tenta reabrir automaticamente.
-        Retorna True se está vivo.
+        Se caiu, reabre e limpa as abas (serão recriadas sob demanda).
         """
-        if not self._running or not self._page:
+        if not self._running or not self._ctx:
             await self.start()
             return self._running
 
         try:
-            _ = self._page.url
+            # Testa qualquer aba existente; se não houver, testa abrindo uma
+            if self._pages:
+                page = next(iter(self._pages.values()))
+                _ = page.url
             return True
         except Exception:
             logger.warning("Browser caiu. Reabrindo...")
@@ -551,22 +489,24 @@ class BrowserSession:
             return self._running
 
     async def stop(self) -> None:
-        """Fecha o browser e libera recursos."""
+        """Fecha todas as abas e encerra o browser."""
         logger.info("Encerrando browser...")
         await self._cleanup()
 
     async def _cleanup(self) -> None:
         self._running = False
+        self._pages.clear()
+
         if self._ctx:
             try:
                 await self._ctx.close()
             except Exception:
                 pass
             self._ctx = None
+
         if self._pw:
             try:
                 await self._pw.stop()
             except Exception:
                 pass
             self._pw = None
-        self._page = None
