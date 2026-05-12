@@ -1,3 +1,5 @@
+from playwright.async_api import TimeoutError as PlaywrightTimeout
+
 from modulos.playwright_func import (
     navigate,
     find_element,
@@ -29,6 +31,12 @@ async def gerar_link_amazon(page, product_url: str) -> dict:
         ])
         if not btn:
             return {"success": False, "affiliate_link": None, "error": "Botão gerar link não encontrado."}
+
+        # Aguarda o botão sair do estado disabled antes de clicar
+        try:
+            await btn.wait_for(state="enabled", timeout=15000)
+        except PlaywrightTimeout:
+            return {"success": False, "affiliate_link": None, "error": "Botão 'Obter link' não habilitou após 15s."}
 
         await human_click_locator(btn)
         await human_delay(1500, 3000)
